@@ -16,6 +16,10 @@ function DownloadForm() {
     setAudioMode,
     setInputText,
     setDownloadPath,
+    setItemCount,
+    setCurrentItem,
+    setProgress,
+    setStatus,
     reset,
   } = useDownloadStore();
 
@@ -44,8 +48,50 @@ function DownloadForm() {
     console.log("Import CSV clicked");
   };
 
-  const handleDownload = () => {
-    console.log("Download clicked");
+  const handleDownload = async () => {
+    if (!inputText.trim()) {
+      console.warn("No input provided");
+      return;
+    }
+
+    try {
+      console.log("Starting download process...");
+      const result = await invoke<{
+        items: Array<{
+          input_type: string;
+          original_input: string;
+          processed_query: string;
+          video_id: string | null;
+        }>;
+        total_count: number;
+        url_count: number;
+        search_count: number;
+      }>("process_input", { inputText, audioMode });
+
+      console.log("Processed input result:", result);
+      setItemCount(result.total_count);
+      setCurrentItem(0);
+      setStatus("Starting download...");
+
+      for (let i = 0; i < result.items.length; i++) {
+        const item = result.items[i];
+        setCurrentItem(i + 1);
+        
+        if (item.input_type === "Url") {
+          setStatus(`Downloading from URL: ${item.original_input}`);
+        } else {
+          setStatus(`Searching: ${item.original_input}`);
+        }
+        
+        console.log(`Item ${i + 1} of ${result.total_count}:`, item);
+      }
+      
+      setStatus("Download complete!");
+      setProgress(100);
+    } catch (error) {
+      console.error("Download failed:", error);
+      setStatus(`Error: ${error}`);
+    }
   };
 
   return (

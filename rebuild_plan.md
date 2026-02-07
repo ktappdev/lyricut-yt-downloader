@@ -75,7 +75,7 @@ The UI should be clean, modern, and single-window (suggested size: ~800x600).
 ## 5. Implementation Roadmap (To-Do List)
 
 ### Phase 1: Project Setup & UI
-- [ ] Initialize new Tauri project (`npm create tauri-app`).
+- [x] Initialize new Tauri project (`npm create tauri-app`).
 - [x] Set up Frontend (React/Vue/etc.) with a component library (e.g., Tailwind, Shadcn, or Material UI).
 - [x] Build the **Main Layout**:
     - [ ] Header with settings.
@@ -85,7 +85,7 @@ The UI should be clean, modern, and single-window (suggested size: ~800x600).
 - [x] Implement State Management (store user input, selected mode, download path).
 
 ### Phase 2: Backend Logic (Rust)
-- [ ] **Command:** `set_download_path` & `open_folder` (using Tauri APIs).
+- [x] **Command:** `set_download_path` & `open_folder` (using Tauri APIs).
 - [ ] **Command:** `process_input` (Main entry point).
     - [ ] Implement Regex to distinguish URL vs. Text.
 - [ ] **Module:** `youtube_client`.
