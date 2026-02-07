@@ -1,11 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use tauri_plugin_dialog::DialogExt;
-use tauri::Emitter;
-use serde::{Serialize, Deserialize};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use tauri::Emitter;
+use tauri_plugin_dialog::DialogExt;
 
 mod youtube_client;
-use crate::youtube_client::{search_video, download_stream, VideoInfo};
+use crate::youtube_client::{download_stream, search_video, VideoInfo};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -50,9 +50,8 @@ fn is_youtube_url(text: &str) -> bool {
 }
 
 fn extract_video_id(url: &str) -> Option<String> {
-    let patterns = [
-        r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([a-zA-Z0-9_-]{11})",
-    ];
+    let patterns =
+        [r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([a-zA-Z0-9_-]{11})"];
 
     for pattern in &patterns {
         if let Ok(regex) = Regex::new(pattern) {
@@ -100,16 +99,22 @@ async fn download_video_command(
 ) -> Result<String, String> {
     let window_clone = window.clone();
     download_stream(&video_id, &output_path, move |progress, message| {
-        let _ = window_clone.emit("download-progress", serde_json::json!({
-            "progress": progress,
-            "message": message
-        }));
+        let _ = window_clone.emit(
+            "download-progress",
+            serde_json::json!({
+                "progress": progress,
+                "message": message
+            }),
+        );
     })
 }
 
 #[tauri::command]
 fn process_input(input_text: String, audio_mode: AudioMode) -> Result<ProcessInputResult, String> {
-    let lines: Vec<&str> = input_text.lines().filter(|line| !line.trim().is_empty()).collect();
+    let lines: Vec<&str> = input_text
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect();
 
     let mut items: Vec<ProcessedItem> = Vec::new();
     let mut url_count = 0;
@@ -171,7 +176,9 @@ mod tests {
 
     #[test]
     fn test_is_youtube_url_with_standard_url() {
-        assert!(is_youtube_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+        assert!(is_youtube_url(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        ));
     }
 
     #[test]
@@ -266,7 +273,8 @@ mod tests {
 
     #[test]
     fn test_process_input_with_mixed_input() {
-        let input = "https://www.youtube.com/watch?v=abc123defgh\nSong One\nhttps://youtu.be/xyz789abcde";
+        let input =
+            "https://www.youtube.com/watch?v=abc123defgh\nSong One\nhttps://youtu.be/xyz789abcde";
         let result = process_input(input.to_string(), AudioMode::Clean).unwrap();
 
         assert_eq!(result.total_count, 3);
@@ -327,7 +335,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![set_download_path, open_folder, process_input, search_video_command, download_video_command])
+        .invoke_handler(tauri::generate_handler![
+            set_download_path,
+            open_folder,
+            process_input,
+            search_video_command,
+            download_video_command
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
