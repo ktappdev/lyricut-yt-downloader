@@ -86,9 +86,9 @@ The UI should be clean, modern, and single-window (suggested size: ~800x600).
 
 ### Phase 2: Backend Logic (Rust)
 - [x] **Command:** `set_download_path` & `open_folder` (using Tauri APIs).
-- [ ] **Command:** `process_input` (Main entry point).
+- [x] **Command:** `process_input` (Main entry point).
     - [ ] Implement Regex to distinguish URL vs. Text.
-- [ ] **Module:** `youtube_client`.
+- [x] **Module:** `youtube_client`.
     - [ ] Integrate a Rust YouTube library (e.g., `rustube` or execute `yt-dlp` as a sidecar binary).
     - [ ] Implement `search_video(query)` -> returns Video ID.
     - [ ] Implement `download_stream(video_id, path)`.
