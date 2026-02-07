@@ -5,7 +5,9 @@ use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
 mod youtube_client;
+mod file_processor;
 use crate::youtube_client::{download_stream, search_video, VideoInfo};
+use crate::file_processor::{clean_filename, convert_to_mp3};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -106,6 +108,29 @@ async fn download_video_command(
                 "message": message
             }),
         );
+    })
+}
+
+#[tauri::command]
+fn clean_filename_command(original_name: String) -> String {
+    clean_filename(&original_name)
+}
+
+#[tauri::command]
+async fn convert_to_mp3_command(
+    input_path: String,
+    output_path: String,
+    window: tauri::Window,
+) -> Result<String, String> {
+    let window_clone = window.clone();
+    convert_to_mp3(&input_path, &output_path).map_err(|e| {
+        let _ = window_clone.emit(
+            "conversion-error",
+            serde_json::json!({
+                "error": e
+            }),
+        );
+        e
     })
 }
 
@@ -340,7 +365,9 @@ pub fn run() {
             open_folder,
             process_input,
             search_video_command,
-            download_video_command
+            download_video_command,
+            clean_filename_command,
+            convert_to_mp3_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
