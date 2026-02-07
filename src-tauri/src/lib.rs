@@ -1,7 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use tauri_plugin_dialog::DialogExt;
+use tauri::Emitter;
 use serde::{Serialize, Deserialize};
 use regex::Regex;
+
+mod youtube_client;
+use crate::youtube_client::{search_video, download_stream, VideoInfo};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AudioMode {
@@ -80,6 +84,26 @@ async fn set_download_path(window: tauri::Window) -> Result<Option<String>, Stri
 #[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
     open::that(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn search_video_command(query: String) -> Result<Option<VideoInfo>, String> {
+    search_video(&query)
+}
+
+#[tauri::command]
+async fn download_video_command(
+    video_id: String,
+    output_path: String,
+    window: tauri::Window,
+) -> Result<String, String> {
+    let window_clone = window.clone();
+    download_stream(&video_id, &output_path, move |progress, message| {
+        let _ = window_clone.emit("download-progress", serde_json::json!({
+            "progress": progress,
+            "message": message
+        }));
+    })
 }
 
 #[tauri::command]
@@ -274,7 +298,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![set_download_path, open_folder, process_input])
+        .invoke_handler(tauri::generate_handler![set_download_path, open_folder, process_input, search_video_command, download_video_command])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
