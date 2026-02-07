@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import App from "../App";
 import "@testing-library/jest-dom";
@@ -50,5 +50,33 @@ describe("App Component", () => {
     const textarea = screen.getByPlaceholderText("Paste links or song names (one per line)...");
     fireEvent.change(textarea, { target: { value: "https://youtube.com/watch?v=test\nAnother song" } });
     expect(textarea).toHaveValue("https://youtube.com/watch?v=test\nAnother song");
+  });
+});
+
+import { invoke } from "@tauri-apps/api/core";
+
+describe("Tauri Commands", () => {
+  it("calls set_download_path command when Change Path is clicked", async () => {
+    vi.mocked(invoke).mockResolvedValue("/selected/path");
+
+    render(<App />);
+    const changePathButton = screen.getByRole("button", { name: "Change Path" });
+    await act(async () => {
+      fireEvent.click(changePathButton);
+    });
+
+    expect(invoke).toHaveBeenCalledWith("set_download_path");
+  });
+
+  it("does not call open_folder when path is empty", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+
+    render(<App />);
+    const openFolderButton = screen.getByRole("button", { name: "Open Folder" });
+    await act(async () => {
+      fireEvent.click(openFolderButton);
+    });
+
+    expect(invoke).not.toHaveBeenCalledWith("open_folder", { path: "" });
   });
 });

@@ -2,6 +2,7 @@ import { Button } from "./components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "./components/ui/Card";
 import { MainLayout, MainLayoutHeader, MainLayoutFooter, DownloadSettings, AudioModeSelector, DownloadInput, ActionButtons, ProgressIndicator } from "./components/layout/MainLayout";
 import { DownloadProvider, useDownloadStore, AudioMode } from "./store/DownloadStore";
+import { invoke } from "@tauri-apps/api/core";
 
 function DownloadForm() {
   const {
@@ -14,15 +15,29 @@ function DownloadForm() {
     itemCount,
     setAudioMode,
     setInputText,
+    setDownloadPath,
     reset,
   } = useDownloadStore();
 
-  const handleChangePath = () => {
-    console.log("Change path clicked");
+  const handleChangePath = async () => {
+    try {
+      const result = await invoke<string | null>("set_download_path");
+      if (result) {
+        setDownloadPath(result);
+      }
+    } catch (error) {
+      console.error("Failed to set download path:", error);
+    }
   };
 
-  const handleOpenFolder = () => {
-    console.log("Open folder clicked");
+  const handleOpenFolder = async () => {
+    if (downloadPath) {
+      try {
+        await invoke("open_folder", { path: downloadPath });
+      } catch (error) {
+        console.error("Failed to open folder:", error);
+      }
+    }
   };
 
   const handleImportCsv = () => {
