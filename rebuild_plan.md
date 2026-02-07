@@ -82,7 +82,7 @@ The UI should be clean, modern, and single-window (suggested size: ~800x600).
     - [ ] Text Area for input.
     - [ ] Radio buttons for Audio Mode.
     - [ ] Action buttons (Download, Import).
-- [ ] Implement State Management (store user input, selected mode, download path).
+- [x] Implement State Management (store user input, selected mode, download path).
 
 ### Phase 2: Backend Logic (Rust)
 - [ ] **Command:** `set_download_path` & `open_folder` (using Tauri APIs).
