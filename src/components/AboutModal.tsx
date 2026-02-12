@@ -26,8 +26,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
       <ModalContent className="space-y-6">
         <div className="text-center">
           <p className="text-gray-300 text-sm leading-relaxed">
-            A modern desktop application for downloading YouTube videos and audio.
-            Built with modern web technologies and wrapped in Tauri for a native experience.
+            A modern desktop application for downloading YouTube audio with automatic metadata tagging.
           </p>
         </div>
         

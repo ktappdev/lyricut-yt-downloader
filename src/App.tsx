@@ -7,7 +7,8 @@ import { AboutModal } from "./components/AboutModal";
 import { SetupOverlay } from "./components/SetupOverlay";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, RotateCcw, Settings, Heart, Info } from "lucide-react";
+import { downloadDir } from "@tauri-apps/api/path";
+import { FolderOpen, RotateCcw, Settings, Heart, Info, CheckCircle2, XCircle, Download } from "lucide-react";
 
 type SetupStatus = "checking" | "downloading" | "ready" | "error";
 
@@ -15,12 +16,20 @@ function SettingsDropdown({
   downloadPath, 
   onChangePath, 
   onOpenFolder,
+  ytdlpStatus,
+  ytdlpPath,
+  onCheckYtdlp,
+  onDownloadYtdlp,
   isOpen,
   onClose 
 }: { 
   downloadPath: string;
   onChangePath: () => void;
   onOpenFolder: () => void;
+  ytdlpStatus: 'detected' | 'missing' | 'checking' | 'downloading';
+  ytdlpPath: string;
+  onCheckYtdlp: () => void;
+  onDownloadYtdlp: () => void;
   isOpen: boolean;
   onClose: () => void;
 }) {
@@ -49,15 +58,74 @@ function SettingsDropdown({
   return (
     <div 
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50 animate-fade-in"
+      className="absolute right-0 top-full mt-2 w-72 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50 animate-fade-in"
     >
       <div className="p-4 border-b border-white/5">
         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <FolderOpen className="w-4 h-4 text-red-500" />
-          Download Location
+          <Settings className="w-4 h-4 text-red-500" />
+          Settings
         </h3>
       </div>
+      
+      {/* yt-dlp Status Section */}
+      <div className="p-4 border-b border-white/5 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-400">yt-dlp:</span>
+          <div className="flex items-center gap-2">
+            {ytdlpStatus === 'detected' && (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-sm text-green-500 font-medium">Detected</span>
+              </>
+            )}
+            {ytdlpStatus === 'missing' && (
+              <>
+                <XCircle className="w-4 h-4 text-red-500" />
+                <span className="text-sm text-red-500 font-medium">Missing</span>
+              </>
+            )}
+            {ytdlpStatus === 'checking' && (
+              <span className="text-sm text-gray-400 font-medium">Checking...</span>
+            )}
+            {ytdlpStatus === 'downloading' && (
+              <span className="text-sm text-yellow-500 font-medium">Downloading...</span>
+            )}
+          </div>
+        </div>
+        {ytdlpPath && ytdlpStatus === 'detected' && (
+          <div className="text-xs text-gray-500 break-all">{ytdlpPath}</div>
+        )}
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onCheckYtdlp} 
+            className="flex-1"
+            disabled={ytdlpStatus === 'checking' || ytdlpStatus === 'downloading'}
+          >
+            Check
+          </Button>
+          {ytdlpStatus === 'missing' && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onDownloadYtdlp} 
+              className="flex-1 text-red-400 hover:text-red-300"
+              disabled={ytdlpStatus === 'downloading'}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Download
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Download Location Section */}
       <div className="p-4 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+          <FolderOpen className="w-4 h-4 text-red-500" />
+          Download Location
+        </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-400">Folder:</span>
           <span className="text-sm text-white font-medium">{folderName}</span>
@@ -84,6 +152,10 @@ function HeaderActions({
   downloadPath,
   onChangePath,
   onOpenFolder,
+  ytdlpStatus,
+  ytdlpPath,
+  onCheckYtdlp,
+  onDownloadYtdlp,
   onCloseSettings
 }: { 
   audioMode: AudioMode;
@@ -94,6 +166,10 @@ function HeaderActions({
   downloadPath: string;
   onChangePath: () => void;
   onOpenFolder: () => void;
+  ytdlpStatus: 'detected' | 'missing' | 'checking' | 'downloading';
+  ytdlpPath: string;
+  onCheckYtdlp: () => void;
+  onDownloadYtdlp: () => void;
   onCloseSettings: () => void;
 }) {
   return (
@@ -126,6 +202,10 @@ function HeaderActions({
           downloadPath={downloadPath}
           onChangePath={onChangePath}
           onOpenFolder={onOpenFolder}
+          ytdlpStatus={ytdlpStatus}
+          ytdlpPath={ytdlpPath}
+          onCheckYtdlp={onCheckYtdlp}
+          onDownloadYtdlp={onDownloadYtdlp}
           isOpen={settingsOpen}
           onClose={onCloseSettings}
         />
@@ -156,6 +236,54 @@ function DownloadForm() {
   } = useDownloadStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [ytdlpStatus, setYtdlpStatus] = useState<'detected' | 'missing' | 'checking' | 'downloading'>('checking');
+  const [ytdlpPath, setYtdlpPath] = useState('');
+
+  useEffect(() => {
+    const initializeDownloadPath = async () => {
+      if (!downloadPath) {
+        try {
+          const defaultPath = await downloadDir();
+          setDownloadPath(defaultPath);
+        } catch (error) {
+          console.error("Failed to get default download directory:", error);
+        }
+      }
+    };
+    
+    initializeDownloadPath();
+  }, [downloadPath, setDownloadPath]);
+
+  useEffect(() => {
+    checkYtdlpStatus();
+  }, []);
+
+  const checkYtdlpStatus = async () => {
+    setYtdlpStatus('checking');
+    try {
+      const path = await invoke<string>("check_ytdlp");
+      setYtdlpPath(path);
+      setYtdlpStatus('detected');
+    } catch (error) {
+      console.error("yt-dlp not detected:", error);
+      setYtdlpPath('');
+      setYtdlpStatus('missing');
+    }
+  };
+
+  const handleDownloadYtdlp = async () => {
+    setYtdlpStatus('downloading');
+    try {
+      const path = await invoke<string>("download_ytdlp");
+      setYtdlpPath(path);
+      setYtdlpStatus('detected');
+      setStatus('yt-dlp installed successfully');
+    } catch (error) {
+      console.error("Failed to download yt-dlp:", error);
+      setYtdlpStatus('missing');
+      setStatus(`Failed to download yt-dlp: ${error}`);
+    }
+  };
 
   const handleChangePath = async () => {
     try {
@@ -239,9 +367,15 @@ function DownloadForm() {
       setStatus("Starting download...");
       setProgress(0);
 
-      const outputPath = downloadPath || "~/Downloads/Youtube/Multi";
+      if (!downloadPath) {
+        setStatus("Error: No download path set");
+        return;
+      }
+
+      const outputPath = downloadPath;
 
       const canUseCsvMetadata = csvData && csvData.tracks.length === result.items.length;
+      const errors: string[] = [];
 
       for (let i = 0; i < result.items.length; i++) {
         const item = result.items[i];
@@ -287,13 +421,19 @@ function DownloadForm() {
              setStatus(`Not found: ${item.processed_query}`);
           }
         } catch (itemError) {
-          console.error(`Failed to process item ${i + 1}:`, itemError);
-          setStatus(`Error processing: ${item.original_input} - ${itemError}`);
+          const errMsg = `Item ${i + 1} (${item.original_input}): ${itemError}`;
+          console.error(errMsg);
+          errors.push(errMsg);
+          setStatus(`Error: ${errMsg}`);
         }
       }
       
       setProgress(100);
-      setStatus("Download complete!");
+      if (errors.length > 0) {
+        setStatus(`Failed ${errors.length}/${result.total_count}: ${errors.join(' | ')}`);
+      } else {
+        setStatus("Download complete!");
+      }
     } catch (error) {
       console.error("Download failed:", error);
       setStatus(`Error: ${error}`);
@@ -366,6 +506,10 @@ function DownloadForm() {
         downloadPath={downloadPath}
         onChangePath={handleChangePath}
         onOpenFolder={handleOpenFolder}
+        ytdlpStatus={ytdlpStatus}
+        ytdlpPath={ytdlpPath}
+        onCheckYtdlp={checkYtdlpStatus}
+        onDownloadYtdlp={handleDownloadYtdlp}
         onCloseSettings={() => setSettingsOpen(false)}
       />
     )
@@ -434,7 +578,7 @@ function AppContent({ showAbout, setShowAbout }: { showAbout: boolean; setShowAb
         header={
           <MainLayoutHeader
             title="Lyricut YT Downloader"
-            description="Download videos, audio, or playlists"
+            description="Download YouTube audio with metadata tagging"
             actions={form.headerActions}
           />
         }
