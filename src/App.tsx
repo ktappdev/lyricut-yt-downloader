@@ -1,15 +1,138 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./components/ui/Card";
-import { MainLayout, MainLayoutHeader, MainLayoutFooter, DownloadSettings, AudioModeSelector, DownloadInput, ActionButtons, ProgressIndicator } from "./components/layout/MainLayout";
+import { MainLayout, MainLayoutHeader, MainLayoutFooter, AudioModeSelector, DownloadInput, ActionButtons, ProgressIndicator } from "./components/layout/MainLayout";
 import { DownloadProvider, useDownloadStore, AudioMode, CsvImportResult } from "./store/DownloadStore";
 import { AboutModal } from "./components/AboutModal";
 import { SetupOverlay } from "./components/SetupOverlay";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, RotateCcw, Info, Heart } from "lucide-react";
+import { FolderOpen, RotateCcw, Settings, Heart, Info } from "lucide-react";
 
 type SetupStatus = "checking" | "downloading" | "ready" | "error";
+
+function SettingsDropdown({ 
+  downloadPath, 
+  onChangePath, 
+  onOpenFolder,
+  isOpen,
+  onClose 
+}: { 
+  downloadPath: string;
+  onChangePath: () => void;
+  onOpenFolder: () => void;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const folderName = downloadPath ? downloadPath.split('/').filter(Boolean).pop() || downloadPath : 'Downloads';
+
+  return (
+    <div 
+      ref={dropdownRef}
+      className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50 animate-fade-in"
+    >
+      <div className="p-4 border-b border-white/5">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <FolderOpen className="w-4 h-4 text-red-500" />
+          Download Location
+        </h3>
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-400">Folder:</span>
+          <span className="text-sm text-white font-medium">{folderName}</span>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onChangePath} className="flex-1">
+            Change
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenFolder} className="flex-1">
+            Open
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeaderActions({ 
+  audioMode, 
+  lineCount, 
+  onReset,
+  onSettingsClick,
+  settingsOpen,
+  downloadPath,
+  onChangePath,
+  onOpenFolder,
+  onCloseSettings
+}: { 
+  audioMode: AudioMode;
+  lineCount: number;
+  onReset: () => void;
+  onSettingsClick: () => void;
+  settingsOpen: boolean;
+  downloadPath: string;
+  onChangePath: () => void;
+  onOpenFolder: () => void;
+  onCloseSettings: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-4">
+      <div className="hidden sm:flex items-center gap-4 text-sm text-gray-400">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500">Mode:</span>
+          <span className="text-white capitalize">{audioMode}</span>
+        </div>
+        <div className="w-px h-4 bg-white/10" />
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500">Items:</span>
+          <span className="text-white">{lineCount}</span>
+        </div>
+      </div>
+      <Button onClick={onReset} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+        <RotateCcw className="w-4 h-4 sm:mr-2" />
+        <span className="hidden sm:inline">Reset</span>
+      </Button>
+      <div className="relative">
+        <Button 
+          onClick={onSettingsClick} 
+          variant="outline" 
+          size="sm"
+          className="text-gray-400 hover:text-white"
+        >
+          <Settings className="w-4 h-4" />
+        </Button>
+        <SettingsDropdown
+          downloadPath={downloadPath}
+          onChangePath={onChangePath}
+          onOpenFolder={onOpenFolder}
+          isOpen={settingsOpen}
+          onClose={onCloseSettings}
+        />
+      </div>
+    </div>
+  );
+}
 
 function DownloadForm() {
   const {
@@ -31,6 +154,8 @@ function DownloadForm() {
     setStatus,
     reset,
   } = useDownloadStore();
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleChangePath = async () => {
     try {
@@ -116,7 +241,6 @@ function DownloadForm() {
 
       const outputPath = downloadPath || "~/Downloads/Youtube/Multi";
 
-      // Check if CSV data matches the processed items count for metadata mapping
       const canUseCsvMetadata = csvData && csvData.tracks.length === result.items.length;
 
       for (let i = 0; i < result.items.length; i++) {
@@ -124,11 +248,9 @@ function DownloadForm() {
         setCurrentItem(i + 1);
         setProgress((i / result.total_count) * 100);
         
-        // Prepare metadata if available
         let metadataOverride = null;
         if (canUseCsvMetadata) {
             const track = csvData.tracks[i];
-            // Verify alignment (optional but safer)
             if (item.original_input.trim() === track.search_query.trim() || 
                 item.processed_query.includes(track.search_query.trim())) {
                 metadataOverride = {
@@ -137,7 +259,6 @@ function DownloadForm() {
                     album: track.metadata.album_name,
                     genre: track.metadata.artist_genres,
                     year: track.metadata.album_release_date,
-                    // BPM/Tempo could be comment or separate field if supported
                 };
             }
         }
@@ -181,98 +302,74 @@ function DownloadForm() {
 
   const lineCount = inputText.split('\n').filter(line => line.trim()).length;
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Download Settings Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FolderOpen className="w-5 h-5 text-red-500" />
-            Download Location
-          </CardTitle>
-          <CardDescription>Choose where to save your downloads</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DownloadSettings
-            downloadPath={downloadPath}
-            onChangePath={handleChangePath}
-            onOpenFolder={handleOpenFolder}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Input Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Download Queue</CardTitle>
-          <CardDescription>
-            Paste YouTube URLs or song names to download
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <DownloadInput
-            value={inputText}
-            onChange={setInputText}
-            placeholder="Paste links or song names (one per line)..."
-          />
-
-          {lineCount > 0 && (
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Info className="w-4 h-4" />
-              <span>{lineCount} item{lineCount !== 1 ? 's' : ''} in queue</span>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 pt-2">
-            <label className="text-sm font-medium text-gray-300">Audio Mode</label>
-            <AudioModeSelector
-              value={audioMode}
-              onChange={(mode: AudioMode) => setAudioMode(mode)}
+  return {
+    content: (
+      <div className="space-y-6 animate-fade-in">
+        <Card>
+          <CardHeader>
+            <CardTitle>Download Queue</CardTitle>
+            <CardDescription>
+              Paste YouTube URLs or song names to download
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <DownloadInput
+              value={inputText}
+              onChange={setInputText}
+              placeholder="Paste links or song names (one per line)..."
             />
-          </div>
 
-          <ActionButtons
-            onImportCsv={handleImportCsv}
-            onDownload={handleDownload}
-            isImportDisabled={inputText.length > 0}
-          />
-        </CardContent>
-      </Card>
+            {lineCount > 0 && (
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <Info className="w-4 h-4" />
+                <span>{lineCount} item{lineCount !== 1 ? 's' : ''} in queue</span>
+              </div>
+            )}
 
-      {/* Progress Card */}
-      {(itemCount > 0 || progress > 0) && (
-        <Card className="border-red-500/20">
-          <CardContent className="pt-6">
-            <ProgressIndicator
-              progress={progress}
-              status={status}
-              currentItem={currentItem}
-              itemCount={itemCount}
+            <div className="flex flex-col gap-3 pt-2">
+              <label className="text-sm font-medium text-gray-300">Audio Mode</label>
+              <AudioModeSelector
+                value={audioMode}
+                onChange={(mode: AudioMode) => setAudioMode(mode)}
+              />
+            </div>
+
+            <ActionButtons
+              onImportCsv={handleImportCsv}
+              onDownload={handleDownload}
+              isImportDisabled={inputText.length > 0}
             />
           </CardContent>
         </Card>
-      )}
 
-      {/* Status Footer */}
-      <div className="flex items-center justify-between p-4 rounded-lg bg-[#1a1a1a] border border-white/5">
-        <div className="flex items-center gap-4 text-sm text-gray-400">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">Mode:</span>
-            <span className="text-white capitalize">{audioMode}</span>
-          </div>
-          <div className="w-px h-4 bg-white/10" />
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">Items:</span>
-            <span className="text-white">{lineCount}</span>
-          </div>
-        </div>
-        <Button onClick={reset} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset
-        </Button>
+        {(itemCount > 0 || progress > 0) && (
+          <Card className="border-red-500/20">
+            <CardContent className="pt-6">
+              <ProgressIndicator
+                progress={progress}
+                status={status}
+                currentItem={currentItem}
+                itemCount={itemCount}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
-    </div>
-  );
+    ),
+    headerActions: (
+      <HeaderActions
+        audioMode={audioMode}
+        lineCount={lineCount}
+        onReset={reset}
+        onSettingsClick={() => setSettingsOpen(true)}
+        settingsOpen={settingsOpen}
+        downloadPath={downloadPath}
+        onChangePath={handleChangePath}
+        onOpenFolder={handleOpenFolder}
+        onCloseSettings={() => setSettingsOpen(false)}
+      />
+    )
+  };
 }
 
 function App() {
@@ -323,11 +420,22 @@ function App() {
 
   return (
     <DownloadProvider>
+      <AppContent showAbout={showAbout} setShowAbout={setShowAbout} />
+    </DownloadProvider>
+  );
+}
+
+function AppContent({ showAbout, setShowAbout }: { showAbout: boolean; setShowAbout: (v: boolean) => void }) {
+  const form = DownloadForm();
+  
+  return (
+    <>
       <MainLayout
         header={
           <MainLayoutHeader
             title="Lyricut YT Downloader"
             description="Download videos, audio, or playlists"
+            actions={form.headerActions}
           />
         }
         footer={
@@ -346,11 +454,11 @@ function App() {
           </MainLayoutFooter>
         }
       >
-        <DownloadForm />
+        {form.content}
       </MainLayout>
       
       <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
-    </DownloadProvider>
+    </>
   );
 }
 

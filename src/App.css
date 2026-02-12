@@ -60,6 +60,7 @@ h1 {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  overscroll-behavior: none;
 }
 
 /* Remove default button styles */

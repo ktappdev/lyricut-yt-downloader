@@ -68,7 +68,7 @@ describe("DownloadStore", () => {
     );
     expect(screen.getByTestId("url")).toHaveTextContent("");
     expect(screen.getByTestId("mode")).toHaveTextContent("video");
-    expect(screen.getByTestId("audioMode")).toHaveTextContent("official");
+    expect(screen.getByTestId("audioMode")).toHaveTextContent("clean");
     expect(screen.getByTestId("downloadPath")).toHaveTextContent("");
     expect(screen.getByTestId("inputText")).toHaveTextContent("");
     expect(screen.getByTestId("progress")).toHaveTextContent("0");
@@ -221,7 +221,7 @@ describe("DownloadStore", () => {
     fireEvent.click(screen.getByText("Reset"));
     expect(screen.getByTestId("url")).toHaveTextContent("");
     expect(screen.getByTestId("mode")).toHaveTextContent("video");
-    expect(screen.getByTestId("audioMode")).toHaveTextContent("official");
+    expect(screen.getByTestId("audioMode")).toHaveTextContent("clean");
     expect(screen.getByTestId("downloadPath")).toHaveTextContent("");
     expect(screen.getByTestId("inputText")).toHaveTextContent("");
   });

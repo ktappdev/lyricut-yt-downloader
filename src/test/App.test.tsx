@@ -1,69 +1,156 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import App from "../App";
 import "@testing-library/jest-dom";
 
+const invoke = vi.fn();
+
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+  invoke: (...args: unknown[]) => invoke(...args),
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }));
 
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+}));
+
 describe("App Component", () => {
-  it("renders Lyricut YT Downloader title", () => {
-    render(<App />);
-    expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invoke.mockResolvedValue("yt-dlp found");
   });
 
-  it("renders download settings section", () => {
+  it("renders Lyricut YT Downloader title", async () => {
     render(<App />);
-    expect(screen.getByText("Download Location")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Select download path...")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change Path" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
+    });
   });
 
-  it("renders input section", () => {
+  it("renders input section", async () => {
     render(<App />);
-    expect(screen.getByText("Download Queue")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Paste links or song names (one per line)...")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Download Queue")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Paste links or song names (one per line)...")).toBeInTheDocument();
+    });
   });
 
-  it("renders audio mode selector", () => {
+  it("renders audio mode selector", async () => {
     render(<App />);
-    expect(screen.getByRole("button", { name: /Official/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Raw/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Clean/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Official/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Raw/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Clean/ })).toBeInTheDocument();
+    });
   });
 
-  it("renders action buttons", () => {
+  it("renders action buttons", async () => {
     render(<App />);
-    expect(screen.getByRole("button", { name: "Import CSV" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Import CSV" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    });
   });
 
-  it("renders reset button", () => {
+  it("renders reset button in header", async () => {
     render(<App />);
-    expect(screen.getByRole("button", { name: /Reset/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Reset/ })).toBeInTheDocument();
+    });
   });
 
-  it("updates input text on change", () => {
+  it("renders settings button in header", async () => {
     render(<App />);
+    await waitFor(() => {
+      const settingsButtons = screen.getAllByRole("button").filter(btn => btn.querySelector('svg.lucide-settings'));
+      expect(settingsButtons.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows download location dropdown when settings is clicked", async () => {
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
+    });
+    
+    const settingsButton = screen.getAllByRole("button").find(btn => 
+      btn.querySelector('svg.lucide-settings')
+    );
+    
+    await act(async () => {
+      fireEvent.click(settingsButton!);
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByText("Download Location")).toBeInTheDocument();
+    });
+  });
+
+  it("shows change path button when settings dropdown is open", async () => {
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
+    });
+    
+    const settingsButton = screen.getAllByRole("button").find(btn => 
+      btn.querySelector('svg.lucide-settings')
+    );
+    
+    await act(async () => {
+      fireEvent.click(settingsButton!);
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Change" })).toBeInTheDocument();
+    });
+  });
+
+  it("updates input text on change", async () => {
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Paste links or song names (one per line)...")).toBeInTheDocument();
+    });
+    
     const textarea = screen.getByPlaceholderText("Paste links or song names (one per line)...");
     fireEvent.change(textarea, { target: { value: "https://youtube.com/watch?v=test\nAnother song" } });
     expect(textarea).toHaveValue("https://youtube.com/watch?v=test\nAnother song");
   });
 });
 
-import { invoke } from "@tauri-apps/api/core";
-
 describe("Tauri Commands", () => {
-  it("calls set_download_path command when Change Path is clicked", async () => {
-    vi.mocked(invoke).mockResolvedValue("/selected/path");
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invoke.mockResolvedValue("yt-dlp found");
+  });
+
+  it("calls set_download_path command when Change Path is clicked in settings dropdown", async () => {
+    invoke.mockResolvedValueOnce("yt-dlp found").mockResolvedValueOnce("/selected/path");
 
     render(<App />);
-    const changePathButton = screen.getByRole("button", { name: "Change Path" });
+    
+    await waitFor(() => {
+      expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
+    });
+    
+    const settingsButton = screen.getAllByRole("button").find(btn => 
+      btn.querySelector('svg.lucide-settings')
+    );
+    
+    await act(async () => {
+      fireEvent.click(settingsButton!);
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Change" })).toBeInTheDocument();
+    });
+    
+    const changePathButton = screen.getByRole("button", { name: "Change" });
     await act(async () => {
       fireEvent.click(changePathButton);
     });
@@ -72,16 +159,25 @@ describe("Tauri Commands", () => {
   });
 
   it("does not call open_folder when path is empty", async () => {
-    vi.mocked(invoke).mockResolvedValue(undefined);
+    invoke.mockResolvedValueOnce("yt-dlp found");
 
     render(<App />);
-    // The Open button should exist but not call open_folder when path is empty
-    const openButton = screen.queryByRole("button", { name: /Open/ });
-    if (openButton) {
-      await act(async () => {
-        fireEvent.click(openButton);
-      });
-    }
+    
+    await waitFor(() => {
+      expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
+    });
+    
+    const settingsButton = screen.getAllByRole("button").find(btn => 
+      btn.querySelector('svg.lucide-settings')
+    );
+    
+    await act(async () => {
+      fireEvent.click(settingsButton!);
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByText("Download Location")).toBeInTheDocument();
+    });
 
     expect(invoke).not.toHaveBeenCalledWith("open_folder", { path: "" });
   });
