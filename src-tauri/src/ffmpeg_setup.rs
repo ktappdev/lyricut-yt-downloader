@@ -107,15 +107,17 @@ fn verify_ffmpeg_runnable(ffmpeg_path: &Path) -> Result<(), String> {
 }
 
 fn find_ffmpeg(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
-    if let Some(system_ffmpeg) = find_in_path(candidate_filenames()).filter(|p| is_executable(p)) {
-        verify_ffmpeg_runnable(&system_ffmpeg)?;
-        return Ok(system_ffmpeg);
-    }
-
     let local_ffmpeg = get_app_ffmpeg_path(app_handle)?;
     if local_ffmpeg.is_file() && is_executable(&local_ffmpeg) {
-        verify_ffmpeg_runnable(&local_ffmpeg)?;
-        return Ok(local_ffmpeg);
+        if verify_ffmpeg_runnable(&local_ffmpeg).is_ok() {
+            return Ok(local_ffmpeg);
+        }
+    }
+
+    if let Some(system_ffmpeg) = find_in_path(candidate_filenames()).filter(|p| is_executable(p)) {
+        if verify_ffmpeg_runnable(&system_ffmpeg).is_ok() {
+            return Ok(system_ffmpeg);
+        }
     }
 
     Err("ffmpeg not found".to_string())
