@@ -2,6 +2,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 
 export type DownloadMode = 'audio' | 'video' | 'playlist';
 export type AudioMode = 'official' | 'raw' | 'clean';
+export type CookieBrowser = 'chrome' | 'firefox' | 'brave' | 'edge' | 'none';
 
 export interface CsvTrackMetadata {
   artist_names?: string;
@@ -37,6 +38,7 @@ interface DownloadState {
   status: string;
   itemCount: number;
   currentItem: number;
+  cookiesBrowser: CookieBrowser;
 }
 
 interface DownloadStoreContextType extends DownloadState {
@@ -50,6 +52,7 @@ interface DownloadStoreContextType extends DownloadState {
   setStatus: (status: string) => void;
   setItemCount: (count: number) => void;
   setCurrentItem: (item: number) => void;
+  setCookiesBrowser: (browser: CookieBrowser) => void;
   reset: () => void;
 }
 
@@ -64,6 +67,7 @@ const defaultState: DownloadState = {
   status: '',
   itemCount: 0,
   currentItem: 0,
+  cookiesBrowser: 'chrome',
 };
 
 const DownloadStoreContext = createContext<DownloadStoreContextType | undefined>(undefined);
@@ -111,6 +115,10 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, currentItem }));
   };
 
+  const setCookiesBrowser = (cookiesBrowser: CookieBrowser) => {
+    setState(prev => ({ ...prev, cookiesBrowser }));
+  };
+
   const reset = () => {
     setState(defaultState);
   };
@@ -129,6 +137,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
         setStatus,
         setItemCount,
         setCurrentItem,
+        setCookiesBrowser,
         reset,
       }}
     >

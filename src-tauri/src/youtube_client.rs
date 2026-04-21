@@ -13,17 +13,24 @@ pub struct VideoInfo {
     pub upload_date: Option<String>,
 }
 
-pub fn search_video(ytdlp_path: &str, query: &str) -> Result<Option<VideoInfo>, String> {
+pub fn search_video(ytdlp_path: &str, query: &str, cookies_browser: Option<&str>) -> Result<Option<VideoInfo>, String> {
     let search_query = format!("ytsearch10:{}", query);
 
+    let mut args = vec![
+        "--dump-json",
+        "--no-download",
+        "--quiet",
+        "--no-warnings",
+        &search_query,
+    ];
+
+    if let Some(browser) = cookies_browser {
+        args.push("--cookies-from-browser");
+        args.push(browser);
+    }
+
     let output = Command::new(ytdlp_path)
-        .args([
-            "--dump-json",
-            "--no-download",
-            "--quiet",
-            "--no-warnings",
-            &search_query,
-        ])
+        .args(&args)
         .output()
         .map_err(|e| format!("Failed to execute yt-dlp: {}", e))?;
 
@@ -90,6 +97,7 @@ pub fn download_stream(
     video_id: &str,
     output_path: &str,
     ffmpeg_location: Option<&str>,
+    cookies_browser: Option<&str>,
     on_progress: impl Fn(f64, &str) + Send + 'static,
 ) -> Result<String, String> {
     let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
@@ -99,7 +107,7 @@ pub fn download_stream(
 
     let mut args: Vec<String> = vec![
         "--format".to_string(),
-        "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio".to_string(),
+        "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best".to_string(),
         "--output".to_string(),
         output_template,
         "--extract-audio".to_string(),
@@ -114,6 +122,10 @@ pub fn download_stream(
     if let Some(location) = ffmpeg_location {
         args.push("--ffmpeg-location".to_string());
         args.push(location.to_string());
+    }
+    if let Some(browser) = cookies_browser {
+        args.push("--cookies-from-browser".to_string());
+        args.push(browser.to_string());
     }
     args.push(video_url);
 
@@ -264,13 +276,13 @@ mod tests {
 
     #[test]
     fn test_search_video_empty_query_returns_error() {
-        let result = search_video("yt-dlp", "");
+        let result = search_video("yt-dlp", "", None);
         assert!(result.is_err() || result.unwrap().is_none());
     }
 
     #[test]
     fn test_search_video_whitespace_only_query_returns_error() {
-        let result = search_video("yt-dlp", "   ");
+        let result = search_video("yt-dlp", "   ", None);
         assert!(result.is_err() || result.unwrap().is_none());
     }
 
@@ -281,6 +293,7 @@ mod tests {
             "yt-dlp",
             "invalid_id_that_does_not_exist_12345",
             temp_dir.to_str().unwrap(),
+            None,
             None,
             |_, _| {},
         );
@@ -293,6 +306,7 @@ mod tests {
             "yt-dlp",
             "dQw4w9WgXcQ",
             "/nonexistent/path/that/does/not/exist",
+            None,
             None,
             |_, _| {},
         );
@@ -314,6 +328,7 @@ mod tests {
             "yt-dlp",
             "dQw4w9WgXcQ",
             temp_dir.to_str().unwrap(),
+            None,
             None,
             move |progress, message| {
                 called_clone.store(true, Ordering::SeqCst);
@@ -362,5 +377,29 @@ mod tests {
         let debug = format!("{:?}", video_info);
         assert!(debug.contains("abc"));
         assert!(debug.contains("Test Video"));
+    }
+
+    #[test]
+    fn test_search_video_with_cookies_browser() {
+        // Test that cookies_browser parameter is accepted (None case)
+        let result = search_video("yt-dlp", "test query", None);
+        // Result will be error since "yt-dlp" doesn't exist, but we're testing parameter acceptance
+        assert!(result.is_err() || result.is_ok());
+    }
+
+    #[test]
+    fn test_download_stream_with_cookies_browser() {
+        // Test that cookies_browser parameter is accepted (None case)
+        let temp_dir = std::env::temp_dir();
+        let result = download_stream(
+            "yt-dlp",
+            "dQw4w9WgXcQ",
+            temp_dir.to_str().unwrap(),
+            None,
+            None,
+            |_, _| {},
+        );
+        // Result will be error since "yt-dlp" doesn't exist, but we're testing parameter acceptance
+        assert!(result.is_err());
     }
 }

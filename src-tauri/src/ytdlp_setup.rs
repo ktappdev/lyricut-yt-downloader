@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use tauri::{Emitter, Manager};
 
 #[cfg(target_os = "windows")]
@@ -35,16 +36,49 @@ pub fn check_ytdlp(app_handle: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+pub fn get_ytdlp_version(app_handle: &tauri::AppHandle) -> Result<String, String> {
+    let path = get_ytdlp_path(app_handle)?;
+    
+    if !path.exists() {
+        return Err("yt-dlp not installed".to_string());
+    }
+    
+    let output = Command::new(&path)
+        .arg("--version")
+        .output()
+        .map_err(|e| format!("Failed to run yt-dlp: {}", e))?;
+    
+    if !output.status.success() {
+        return Err(format!("yt-dlp exited with error: {}", output.status));
+    }
+    
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 #[tauri::command]
-pub async fn download_ytdlp(app_handle: tauri::AppHandle) -> Result<String, String> {
+pub fn get_ytdlp_version_command(app_handle: tauri::AppHandle) -> Result<String, String> {
+    get_ytdlp_version(&app_handle)
+}
+
+#[tauri::command]
+pub async fn download_ytdlp(app_handle: tauri::AppHandle, force: Option<bool>) -> Result<String, String> {
     let path = get_ytdlp_path(&app_handle)?;
+    let force = force.unwrap_or(false);
     
     if path.exists() {
-        let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
-            "status": "already_installed",
-            "message": "yt-dlp already installed"
-        }));
-        return Ok(path.to_string_lossy().to_string());
+        if force {
+            let _ = fs::remove_file(&path);
+            let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
+                "status": "updating",
+                "message": "Removing old yt-dlp version"
+            }));
+        } else {
+            let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
+                "status": "already_installed",
+                "message": "yt-dlp already installed"
+            }));
+            return Ok(path.to_string_lossy().to_string());
+        }
     }
     
     let _ = app_handle.emit("ytdlp-progress", serde_json::json!({

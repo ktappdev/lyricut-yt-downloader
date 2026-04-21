@@ -16,7 +16,7 @@ use crate::csv_parser::{parse_csv_content, validate_csv_headers, CsvImportResult
 use crate::file_processor::{clean_filename, convert_to_mp3_with_ffmpeg};
 use crate::youtube_client::{download_stream, search_video, VideoInfo};
 use crate::metadata::{tag_mp3, TrackMetadata, parse_title_for_metadata};
-use crate::ytdlp_setup::{check_ytdlp, download_ytdlp, get_ytdlp_command};
+use crate::ytdlp_setup::{check_ytdlp, download_ytdlp, get_ytdlp_command, get_ytdlp_version_command};
 use crate::ffmpeg_setup::{check_ffmpeg, download_ffmpeg};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,15 +99,16 @@ fn open_folder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn search_video_command(query: String, app_handle: tauri::AppHandle) -> Result<Option<VideoInfo>, String> {
+async fn search_video_command(query: String, cookies_browser: Option<String>, app_handle: tauri::AppHandle) -> Result<Option<VideoInfo>, String> {
     let ytdlp_path = get_ytdlp_command(&app_handle)?;
-    search_video(&ytdlp_path, &query)
+    search_video(&ytdlp_path, &query, cookies_browser.as_deref())
 }
 
 #[tauri::command]
 async fn download_video_command(
     video_id: String,
     output_path: String,
+    cookies_browser: Option<String>,
     window: tauri::Window,
 ) -> Result<String, String> {
     let ytdlp_path = get_ytdlp_command(&window.app_handle())?;
@@ -126,6 +127,7 @@ async fn download_video_command(
         &video_id,
         &output_path,
         Some(&ffmpeg_path),
+        cookies_browser.as_deref(),
         move |progress, message| {
         let _ = window_clone.emit(
             "download-progress",
@@ -142,6 +144,7 @@ async fn download_video_command(
 async fn process_item(
     video_id: String,
     output_path: String,
+    cookies_browser: Option<String>,
     metadata_override: Option<TrackMetadata>,
     window: tauri::Window,
 ) -> Result<String, String> {
@@ -163,6 +166,7 @@ async fn process_item(
         &video_id,
         &output_path,
         Some(&ffmpeg_path),
+        cookies_browser.as_deref(),
         move |progress, message| {
         let _ = window_clone.emit(
             "download-progress",
@@ -588,6 +592,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_ytdlp,
             download_ytdlp,
+            get_ytdlp_version_command,
             check_ffmpeg,
             download_ffmpeg,
             set_download_path,

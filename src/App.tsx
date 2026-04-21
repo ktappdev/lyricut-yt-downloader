@@ -2,16 +2,24 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "./components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./components/ui/Card";
 import { MainLayout, MainLayoutHeader, MainLayoutFooter, AudioModeSelector, DownloadInput, ActionButtons, ProgressIndicator } from "./components/layout/MainLayout";
-import { DownloadProvider, useDownloadStore, AudioMode, CsvImportResult } from "./store/DownloadStore";
+import { DownloadProvider, useDownloadStore, AudioMode, CsvImportResult, CookieBrowser } from "./store/DownloadStore";
 import { AboutModal } from "./components/AboutModal";
 import { SetupOverlay } from "./components/SetupOverlay";
 import { FfmpegWarning } from "./components/FfmpegWarning";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { downloadDir } from "@tauri-apps/api/path";
-import { FolderOpen, RotateCcw, Settings, Heart, Info, CheckCircle2, XCircle, Download } from "lucide-react";
+import { FolderOpen, RotateCcw, Settings, Heart, Info, CheckCircle2, XCircle, Download, Shield, RefreshCw } from "lucide-react";
 
 type SetupStatus = "checking" | "downloading" | "ready" | "error";
+
+const BROWSER_OPTIONS: { value: CookieBrowser; label: string }[] = [
+  { value: 'none', label: 'None (Default)' },
+  { value: 'chrome', label: 'Chrome' },
+  { value: 'firefox', label: 'Firefox' },
+  { value: 'brave', label: 'Brave' },
+  { value: 'edge', label: 'Edge' },
+];
 
 function SettingsDropdown({ 
   downloadPath, 
@@ -25,6 +33,8 @@ function SettingsDropdown({
   ffmpegSource,
   onCheckFfmpeg,
   onDownloadFfmpeg,
+  cookiesBrowser,
+  onCookiesBrowserChange,
   isOpen,
   onClose 
 }: { 
@@ -39,10 +49,27 @@ function SettingsDropdown({
   ffmpegSource: string;
   onCheckFfmpeg: () => void;
   onDownloadFfmpeg: () => void;
+  cookiesBrowser: CookieBrowser;
+  onCookiesBrowserChange: (browser: CookieBrowser) => void;
   isOpen: boolean;
   onClose: () => void;
 }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [ytdlpVersion, setYtdlpVersion] = useState<string>('');
+
+  useEffect(() => {
+    if (ytdlpStatus === 'detected') {
+      invoke<string>('get_ytdlp_version_command')
+        .then(version => setYtdlpVersion(version))
+        .catch(() => setYtdlpVersion(''));
+    } else {
+      setYtdlpVersion('');
+    }
+  }, [ytdlpStatus]);
+
+  const handleUpdateYtdlp = () => {
+    invoke('download_ytdlp', { force: true });
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -104,6 +131,9 @@ function SettingsDropdown({
         {ytdlpPath && ytdlpStatus === 'detected' && (
           <div className="text-xs text-gray-500 break-all">{ytdlpPath}</div>
         )}
+        {ytdlpVersion && ytdlpStatus === 'detected' && (
+          <div className="text-xs text-cyan-400 font-medium">v{ytdlpVersion}</div>
+        )}
         <div className="flex gap-2">
           <Button 
             variant="outline" 
@@ -123,6 +153,17 @@ function SettingsDropdown({
             >
               <Download className="w-4 h-4 mr-1" />
               Download
+            </Button>
+          )}
+          {ytdlpStatus === 'detected' && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleUpdateYtdlp} 
+              className="flex-1 text-cyan-400 hover:text-cyan-300"
+            >
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Update
             </Button>
           )}
         </div>
@@ -180,6 +221,31 @@ function SettingsDropdown({
         </div>
       </div>
 
+      {/* Cookies Browser Section */}
+      <div className="p-4 border-b border-white/5 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-white mb-2">
+          <Shield className="w-4 h-4 text-red-500" />
+          Bot Detection Bypass
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs text-gray-400">Use browser cookies for authentication</label>
+          <select
+            value={cookiesBrowser}
+            onChange={(e) => onCookiesBrowserChange(e.target.value as CookieBrowser)}
+            className="w-full px-3 py-2 bg-[#0d0d0d] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
+          >
+            {BROWSER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">
+            Helps bypass bot detection on restricted videos
+          </p>
+        </div>
+      </div>
+
       {/* Download Location Section */}
       <div className="p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-white mb-2">
@@ -220,6 +286,8 @@ function HeaderActions({
   ffmpegSource,
   onCheckFfmpeg,
   onDownloadFfmpeg,
+  cookiesBrowser,
+  onCookiesBrowserChange,
   onCloseSettings
 }: { 
   audioMode: AudioMode;
@@ -238,6 +306,8 @@ function HeaderActions({
   ffmpegSource: string;
   onCheckFfmpeg: () => void;
   onDownloadFfmpeg: () => void;
+  cookiesBrowser: CookieBrowser;
+  onCookiesBrowserChange: (browser: CookieBrowser) => void;
   onCloseSettings: () => void;
 }) {
   return (
@@ -278,6 +348,8 @@ function HeaderActions({
           ffmpegSource={ffmpegSource}
           onCheckFfmpeg={onCheckFfmpeg}
           onDownloadFfmpeg={onDownloadFfmpeg}
+          cookiesBrowser={cookiesBrowser}
+          onCookiesBrowserChange={onCookiesBrowserChange}
           isOpen={settingsOpen}
           onClose={onCloseSettings}
         />
@@ -296,6 +368,7 @@ function DownloadForm() {
     status,
     currentItem,
     itemCount,
+    cookiesBrowser,
     setAudioMode,
     setInputText,
     setCsvData,
@@ -304,6 +377,7 @@ function DownloadForm() {
     setCurrentItem,
     setProgress,
     setStatus,
+    setCookiesBrowser,
     reset,
   } = useDownloadStore();
 
@@ -444,6 +518,10 @@ function DownloadForm() {
     }
   };
 
+  const getCookiesBrowserArg = (): string | null => {
+    return cookiesBrowser === 'none' ? null : cookiesBrowser;
+  };
+
   const handleDownload = async () => {
     if (!inputText.trim()) {
       console.warn("No input provided");
@@ -476,6 +554,7 @@ function DownloadForm() {
       }
 
       const outputPath = downloadPath;
+      const cookiesArg = getCookiesBrowserArg();
 
       const canUseCsvMetadata = csvData && csvData.tracks.length === result.items.length;
       const errors: string[] = [];
@@ -507,6 +586,7 @@ function DownloadForm() {
             setStatus(`Searching: ${item.processed_query}`);
             const videoInfo = await invoke<{ id: string } | null>("search_video_command", {
               query: item.processed_query,
+              cookiesBrowser: cookiesArg,
             });
             if (videoInfo) {
                 videoId = videoInfo.id;
@@ -518,6 +598,7 @@ function DownloadForm() {
             await invoke<string>("process_item", {
               videoId,
               outputPath,
+              cookiesBrowser: cookiesArg,
               metadataOverride
             });
           } else {
@@ -617,6 +698,8 @@ function DownloadForm() {
         ffmpegSource={ffmpegSource}
         onCheckFfmpeg={checkFfmpegStatus}
         onDownloadFfmpeg={handleDownloadFfmpeg}
+        cookiesBrowser={cookiesBrowser}
+        onCookiesBrowserChange={setCookiesBrowser}
         onCloseSettings={() => setSettingsOpen(false)}
       />
     )

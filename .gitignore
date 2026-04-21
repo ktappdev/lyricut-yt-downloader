@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 .todos/
+.pi/agent-sessions/
