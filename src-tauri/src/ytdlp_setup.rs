@@ -65,12 +65,13 @@ pub async fn download_ytdlp(app_handle: tauri::AppHandle, force: Option<bool>) -
     let path = get_ytdlp_path(&app_handle)?;
     let force = force.unwrap_or(false);
     
+    let temp_path = path.with_extension("tmp");
+    
     if path.exists() {
         if force {
-            let _ = fs::remove_file(&path);
             let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
                 "status": "updating",
-                "message": "Removing old yt-dlp version"
+                "message": "Downloading updated yt-dlp version"
             }));
         } else {
             let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
@@ -127,27 +128,42 @@ pub async fn download_ytdlp(app_handle: tauri::AppHandle, force: Option<bool>) -
         "message": "Writing binary to disk..."
     }));
     
-    fs::write(&path, &bytes)
+    fs::write(&temp_path, &bytes)
         .map_err(|e| {
             let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
                 "status": "error",
                 "message": format!("Failed to write file: {}", e)
             }));
+            let _ = fs::remove_file(&temp_path);
             format!("Failed to write yt-dlp binary: {}", e)
         })?;
     
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+        fs::set_permissions(&temp_path, fs::Permissions::from_mode(0o755))
             .map_err(|e| {
                 let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
                     "status": "error",
                     "message": format!("Failed to set permissions: {}", e)
                 }));
+                let _ = fs::remove_file(&temp_path);
                 format!("Failed to set executable permissions: {}", e)
             })?;
     }
+    
+    // Atomic replace
+    fs::rename(&temp_path, &path)
+        .map_err(|e| {
+            let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
+                "status": "error",
+                "message": "Could not replace yt-dlp — it may be in use. Close any running downloads and try again."
+            }));
+            let _ = fs::remove_file(&temp_path);
+            format!("Failed to replace existing yt-dlp: {}", e)
+        })?;
+    
+
     
     let _ = app_handle.emit("ytdlp-progress", serde_json::json!({
         "status": "complete",

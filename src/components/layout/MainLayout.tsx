@@ -27,7 +27,7 @@ const MainLayout = React.forwardRef<HTMLDivElement, MainLayoutProps>(
             {header}
           </header>
         )}
-        <main className="flex-1 container mx-auto p-4 md:p-6 lg:p-8 max-w-4xl">
+        <main className="flex-1 container mx-auto p-4 md:p-5 max-w-4xl">
           {children}
         </main>
         {footer && (
@@ -194,7 +194,7 @@ function DownloadInput({ value, onChange, placeholder, disabled, className }: Do
       value={value}
       onChange={(e) => onChange(e.currentTarget.value)}
       placeholder={placeholder || "Paste links or song names (one per line)..."}
-      className={cn("min-h-[180px] font-mono text-sm bg-[#1a1a1a]", className)}
+      className={cn("min-h-[140px] font-mono text-sm bg-[#1a1a1a]", className)}
       disabled={disabled}
     />
   );

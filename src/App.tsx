@@ -14,8 +14,8 @@ import { FolderOpen, RotateCcw, Settings, Heart, Info, CheckCircle2, XCircle, Do
 type SetupStatus = "checking" | "downloading" | "ready" | "error";
 
 const BROWSER_OPTIONS: { value: CookieBrowser; label: string }[] = [
-  { value: 'none', label: 'None (Default)' },
-  { value: 'chrome', label: 'Chrome' },
+  { value: 'none', label: 'None' },
+  { value: 'chrome', label: 'Chrome (Default)' },
   { value: 'firefox', label: 'Firefox' },
   { value: 'brave', label: 'Brave' },
   { value: 'edge', label: 'Edge' },
@@ -67,8 +67,15 @@ function SettingsDropdown({
     }
   }, [ytdlpStatus]);
 
-  const handleUpdateYtdlp = () => {
-    invoke('download_ytdlp', { force: true });
+  const handleUpdateYtdlp = async () => {
+    try {
+      await invoke('download_ytdlp', { force: true });
+      // Refresh version after update
+      const newVersion = await invoke<string>('get_ytdlp_version_command');
+      setYtdlpVersion(newVersion);
+    } catch (e) {
+      console.error('Update failed', e);
+    }
   };
 
   useEffect(() => {
@@ -628,7 +635,7 @@ function DownloadForm() {
 
   return {
     content: (
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-4 animate-fade-in">
         <Card>
           <CardHeader>
             <CardTitle>Download Queue</CardTitle>
@@ -636,7 +643,7 @@ function DownloadForm() {
               Paste YouTube URLs or song names to download
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <DownloadInput
               value={inputText}
               onChange={setInputText}

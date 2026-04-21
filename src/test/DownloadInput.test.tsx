@@ -22,8 +22,8 @@ describe("DownloadInput Component", () => {
   it("renders textarea with minimum height", () => {
     const { container } = render(<DownloadInput value="" onChange={() => {}} />);
     const textarea = container.querySelector("textarea");
-    // Updated to match new min-h-[180px] class
-    expect(textarea).toHaveClass("min-h-[180px]");
+    // Updated to match new min-h-[140px] class
+    expect(textarea).toHaveClass("min-h-[140px]");
   });
 
   it("allows resizing vertically", () => {
