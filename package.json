@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "tag:patch": "npm version patch && git push --follow-tags",
+    "tag:minor": "npm version minor && git push --follow-tags",
+    "tag:major": "npm version major && git push --follow-tags",
+    "tag:beta": "npm version prerelease --preid=beta && git push --follow-tags"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
